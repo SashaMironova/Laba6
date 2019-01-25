@@ -1,18 +1,23 @@
 package Server;
 
-import java.net.*;
-import java.io.*;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
+
+import java.io.*;
 import java.lang.reflect.Type;
-import java.util.*;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 
 public class Server {
-    public static void main(String[] args){
+    private static CopyOnWriteArrayList<InjuredPoliceman> injuredPolicemen;
+
+    public static void main(String[] args) {
 
         Gson gson = new Gson();
         String json = "";
@@ -22,40 +27,44 @@ public class Server {
         String str = inputOutput.input();
         Type type = new TypeToken<CopyOnWriteArrayList<InjuredPoliceman>>() {
         }.getType();
-        CopyOnWriteArrayList<InjuredPoliceman> injuredPolicemen = gson.fromJson(str, type);
+        injuredPolicemen = gson.fromJson(str, type);
 
         if (injuredPolicemen == null)
             injuredPolicemen = new CopyOnWriteArrayList<InjuredPoliceman>();
 
         Collections.sort(injuredPolicemen, new InjuredPolicemanComparator());
 
-        int port = 1234;
-        try {
-            ServerSocket ss = null;
-            Socket socket = null;
+            int port = 1234;
             try {
-                 ss = new ServerSocket(port);
-            } catch (IOException e){
-                System.out.println("Не можем подключиться к порту 1234");
-                System.exit(-1);
-            }
-            try {
-                System.out.println("Ожидаем поключения");
+            ServerSocket ss;
+            Socket socket;
+            ss = new ServerSocket(port);
+            System.out.println("Ожидаем поключения");
+            while (true) {
                 socket = ss.accept();
+                Socket s = socket;
                 System.out.println("Клиент подключился");
-            }catch (IOException e){
-                System.out.println("Подключение невозможно");
-                System.exit(-1);
-            }
 
+                new Thread(() -> connectClient(s)).start();
+            }
+        } catch (Exception e) {
+            System.out.println(e);
+        }
+    }
+
+    private static void connectClient(Socket socket) {
+        Gson gson = new Gson();
+        String json = "";
+
+        InputOutput inputOutput = new InputOutput();
+
+        try {
             InputStream inputStream = socket.getInputStream();
             OutputStream outputStream = socket.getOutputStream();
 
             DataInputStream in = new DataInputStream(inputStream);
             DataOutputStream out = new DataOutputStream(outputStream);
-
-            try {
-                while (true) {
+            while (true) {
                     String line = null;
                     line = in.readUTF();//в лайне лежит строка, полученная от клиента
                     String[] fewWords = line.split(" ");
@@ -218,28 +227,15 @@ public class Server {
                             inputOutput.output(json);
                             out.writeUTF("OK");
                             break;
-                        /*case "exit":
-                            System.out.println("in server");
-                            String json = "";
-                            json = gson.toJson(injuredPolicemen);
-                            inputOutput.output(json);
-                            System.exit(0);
-                            break;*/
+
                         default:
                             out.writeUTF("Неправильная команда");
                             break;
                     }
-                    out.flush();
-                    //out.close();//todo куда-то засунуть close
-                    //in.close();
-                    //socket.close();
-                    //ss.close();
-                }
-            } catch(Exception e) {
-                System.out.println("Клиент отключился");
             }
+
         } catch (Exception e) {
-            System.out.println(e);
+            System.out.println("Клиент отключился");
         }
     }
 }
